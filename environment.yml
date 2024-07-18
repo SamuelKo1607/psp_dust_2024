@@ -1,0 +1,17 @@
+name: psp_dust_2024
+channels:
+  - defaults
+dependencies:
+  - scipy=1.11
+  - matplotlib
+  - pandas=2.1
+  - spyder=5.5
+  - numpy=1.26
+  - numpy-stl=3.1.1
+  - cdflib=1.2
+  - conda-forge::pyreadr=0.5
+  - tqdm=4.65
+  - conda-forge::alive-progress=3.1
+  - numba=0.59
+  - cudatoolkit=11.8
+  - conda-forge::numba-stats=1.7
