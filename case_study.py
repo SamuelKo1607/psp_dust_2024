@@ -151,12 +151,16 @@ def evaluate_match(s_n,s_e,s_r,s_vr,s_vt,
     return distance,v_rad,beta_lo,beta_hi,bound_lo,bound_hi
 
 
-def main(solo_df, psp_df):
-    matches = find_matches(solo_df, psp_df)
+def main(solo_df, psp_df, matches):
+
+
+    solo_phase = get_phase_angle(solo_ephemeris_file)
+    psp_phase = get_phase_angle(psp_sun_ephemeris_file)
 
     distances = np.zeros(0)
     v_rads = np.zeros(0)
     raws = np.zeros(0)
+    raws_stds = np.zeros(0)
     beta_los = np.zeros(0)
     beta_his = np.zeros(0)
     bound_los = np.zeros(0)
@@ -175,7 +179,8 @@ def main(solo_df, psp_df):
         s_r = np.mean(s_hit_df['Radial distance [au]'])
         s_v_rad = np.mean(s_hit_df['Radial velocity [km/s]'])
         s_v_tan = np.mean(s_hit_df['Tangential velocity [km/s]'])
-        print("solo: ",jd2date(m[0]).date(),s_r, s_v_rad, s_v_tan, s_flux)
+        print("solo: ",jd2date(m[0]).date(),s_r,s_v_rad,s_v_tan,s_flux)
+        print("longitude: ",solo_phase(m[0])+(solo_phase(m[0])<0)*360)
 
         p_hit_df = get_near(psp_df,m[1],days=7)
         psp_jds = np.append(psp_jds,m[1])
@@ -186,7 +191,20 @@ def main(solo_df, psp_df):
         p_r = np.mean(p_hit_df['Radial distance [au]'])
         p_v_rad = np.mean(p_hit_df['Radial velocity [km/s]'])
         p_v_tan = np.mean(p_hit_df['Tangential velocity [km/s]'])
-        print("psp: ",jd2date(m[1]).date(),p_r, p_v_rad, p_v_tan, p_flux)
+        print("psp: ",jd2date(m[1]).date(),p_r,p_v_rad,p_v_tan,p_flux)
+        print("longitude: ",psp_phase(m[1])+(psp_phase(m[1])<0)*360)
+
+        s_flux_bootstrapped = np.random.poisson(
+            np.sum(s_hit_df['Fluxes [/day]']),
+            size=1000) /np.sum(s_hit_df['Detection time [hours]']
+                               *s_hit_df['Area front [m^2]'])
+        p_flux_bootstrapped = np.random.poisson(
+            np.sum(p_hit_df['Count corrected [/day]']),
+            size=1000) /np.sum(p_hit_df['Detection time [hours]']
+                               *p_hit_df['Area front [m^2]'])
+
+        raws_bootstrapped = p_flux_bootstrapped / s_flux_bootstrapped
+        std_bootstrepped = np.std(raws_bootstrapped)
 
         distance,v_rad,beta_lo,beta_hi,bound_lo,bound_hi = evaluate_match(
             np.sum(s_hit_df['Fluxes [/day]']),
@@ -201,6 +219,7 @@ def main(solo_df, psp_df):
         distances = np.append(distances,distance)
         v_rads = np.append(v_rads,v_rad)
         raws = np.append(raws,p_flux/s_flux)
+        raws_stds = np.append(raws_stds,std_bootstrepped)
         beta_los = np.append(beta_los,beta_lo)
         beta_his = np.append(beta_his,beta_hi)
         bound_los = np.append(bound_los,bound_lo)
@@ -218,17 +237,23 @@ def main(solo_df, psp_df):
 
     plt.scatter(v_rads,raws,color="k",label="raw")
     offset = np.zeros(6)
-    offset[0] = -3
-    offset[5] = 3
-    offset[1] = 1.5
-    offset[3] = -1.5
+    offset[0] = -5 #-3
+    offset[1] = 5  #1.5
+    offset[2] = 5
+    offset[3] = -5
+    offset[4] = 5
+    offset[5] = 5
+
     for i in range(len(psp_jds)):
-        plt.annotate(jd2date(psp_jds[i]).date(),
+        plt.annotate(jd2date(psp_jds[i]).date().strftime("%d/%m/%y"),
                      (v_rads[i]+offset[i],raws[i]+0.01),
-                     c="k",ha="center",fontsize="small")
-        plt.annotate(jd2date(solo_jds[i]).date(),
+                     c="k",ha="center",fontsize="x-small")
+        plt.annotate(jd2date(solo_jds[i]).date().strftime("%d/%m/%y"),
                      (v_rads[i]+offset[i],raws[i]-0.02),
-                     c="grey",ha="center",fontsize="small")
+                     c="grey",ha="center",fontsize="x-small")
+        plt.vlines(v_rads[i],raws[i]-raws_stds[i],raws[i]+raws_stds[i],
+                   colors="k")
+
     plt.text(0.05, 0.92, 'PSP date',
              horizontalalignment='left',
              verticalalignment='top',
@@ -242,7 +267,7 @@ def main(solo_df, psp_df):
     plt.xlabel(r"Radial speed [$km/s$]")
     plt.ylabel("14 days flux PSP/SolO [$1$]")
     plt.xlim(-26,26)
-    plt.ylim(0.26,0.54)
+    plt.ylim(0.26,0.61)
     plt.tight_layout()
     plt.savefig(figures_location+"case_study"+".pdf",format="pdf")
     plt.show()
@@ -255,7 +280,6 @@ def main(solo_df, psp_df):
 if __name__ == "__main__":
 
     solo_df, psp_df = load_data()
-    print(main(solo_df, psp_df))
+    matches = find_matches(solo_df, psp_df)
 
-
-
+    print(main(solo_df, psp_df, matches))
